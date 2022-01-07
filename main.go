@@ -1,6 +1,9 @@
 package main
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 type Nterm struct {
 	//	⟨nterm⟩ ::= [A–Z][0–9] ∗
@@ -20,8 +23,14 @@ type Term struct {
 	str string //	[a-z]
 }
 
-func Term_init(str string) (t Term) {
-
+func TermInit(str string) (t Term) {
+	isNt, _ := regexp.MatchString("[a-z]", str)
+	if !isNt {
+		t.nt = Nterm_init(str)
+	} else {
+		t.str = str
+	}
+	return
 }
 
 type Rule struct {
@@ -32,28 +41,40 @@ type Rule struct {
 	t   Term
 }
 
+func RuleInit(str string) (r Rule) {
+	lr := strings.Split(str, "->")
+	r.nt = Nterm_init(lr[0])
+	var indTerm int
+	var tempStr []byte
+	for i, c := range lr[1] {
+		isAZ, _ := regexp.MatchString("a-z", string(c))
+		if isAZ {
+			tempStr = append(tempStr, byte(c))
+		} else {
+			indTerm = i
+			break
+		}
+	}
+	r.str = string(tempStr)
+	r.t = TermInit(lr[1][indTerm:])
+	return
+}
+
 type CFG struct {
 	//	⟨grammar⟩ ::= ⟨rule⟩ +
 
 	rules []Rule
 }
 
-func parse_in(str string) {
+func CFGInit(str string) (cfg CFG) {
 	strs := strings.Split(str, "/n")
-	for ind, s := range strs {
-		var (
-			nt  Nterm
-			t   Term
-			r   Rule
-			cfg CFG
-		)
-		lr := strings.Split(s, "->")
-		nt.str = lr[0]
-
+	for _, s := range strs {
+		cfg.rules = append(cfg.rules, RuleInit(s))
 	}
+	return
 }
 
-func reg_analysis() {
+func regAnalysis() {
 	/*
 		Анализ регулярных подмножеств грамматики.
 		Нахождение максимальных множеств M i нетерминалов
@@ -64,7 +85,7 @@ func reg_analysis() {
 
 }
 
-func tree_unpacking() {
+func treeUnpacking() {
 	/*
 		Развёртка дерева левосторонних разборов исходной
 		грамматики. Для каждого достижимого из стартового
@@ -80,7 +101,7 @@ func tree_unpacking() {
 
 }
 
-func check_min_ways() {
+func checkMinWays() {
 	/*
 		Если Φ 1 ∈ L(Φ +
 		2 ), тогда проверяем все кратчайшие
@@ -95,7 +116,7 @@ func check_min_ways() {
 
 }
 
-func rec_probably_reg() {
+func recProbablyReg() {
 	/*
 		Рекурсивно замыкаем множества регулярных и возможно
 		регулярных нетерминалов. Если при переписывании
@@ -106,7 +127,7 @@ func rec_probably_reg() {
 
 }
 
-func print_no_info() {
+func printNoInfo() {
 	/*
 		Если рекурсивное замыкание не дало никакой
 		информации об исходном нетерминале S, но не было и
@@ -117,7 +138,8 @@ func print_no_info() {
 }
 
 func main() {
+	var str string // from test file
 
-	print_no_info(rec_probably_reg(check_min_ways(tree_unpacking(reg_analysis(cfg)))))
+	printNoInfo(recProbablyReg(checkMinWays(treeUnpacking(regAnalysis(CFGInit(str))))))
 
 }

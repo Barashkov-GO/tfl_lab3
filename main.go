@@ -1,7 +1,10 @@
 package main
 
 import (
+	"fmt"
+	"os"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -11,7 +14,7 @@ type Nterm struct {
 	str string
 }
 
-func Nterm_init(str string) (n Nterm) {
+func NtermInit(str string) (n Nterm) {
 	n.str = str
 	return
 }
@@ -26,7 +29,7 @@ type Term struct {
 func TermInit(str string) (t Term) {
 	isNt, _ := regexp.MatchString("[a-z]", str)
 	if !isNt {
-		t.nt = Nterm_init(str)
+		t.nt = NtermInit(str)
 	} else {
 		t.str = str
 	}
@@ -43,7 +46,9 @@ type Rule struct {
 
 func RuleInit(str string) (r Rule) {
 	lr := strings.Split(str, "->")
-	r.nt = Nterm_init(lr[0])
+	r.nt = NtermInit(lr[0][:len(lr[0])-1])
+	lr[1] = lr[1][1:]
+
 	var indTerm int
 	var tempStr []byte
 	for i, c := range lr[1] {
@@ -67,10 +72,19 @@ type CFG struct {
 }
 
 func CFGInit(str string) (cfg CFG) {
-	strs := strings.Split(str, "/n")
+	strs := strings.Split(str, "\n")
 	for _, s := range strs {
 		cfg.rules = append(cfg.rules, RuleInit(s))
 	}
+	return
+}
+
+func (cfg CFG) toString() (str string) {
+	str = "CFG:\n"
+	for _, r := range cfg.rules {
+		str += "\t" + r.nt.str + " -> " + r.str + r.t.nt.str + r.t.str + "\n"
+	}
+	str += "-----------------------\n"
 	return
 }
 
@@ -137,9 +151,28 @@ func printNoInfo() {
 
 }
 
-func main() {
-	var str string // from test file
+func read(path string) (cfg CFG) {
+	file, err := os.Open(path)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	defer file.Close()
+	data := make([]byte, 64)
+	n, _ := file.Read(data)
+	cfg = CFGInit(string(data[:n]))
+	return
+}
 
-	printNoInfo(recProbablyReg(checkMinWays(treeUnpacking(regAnalysis(CFGInit(str))))))
+const TESTS_COUNT = 1
+
+func main() {
+	//var str string // from test file
+
+	for i := 1; i <= TESTS_COUNT; i++ {
+		cfg := read("tests/test" + strconv.Itoa(i) + ".txt")
+		printNoInfo(recProbablyReg(checkMinWays(treeUnpacking(regAnalysis(cfg)))))
+	}
+	//
 
 }

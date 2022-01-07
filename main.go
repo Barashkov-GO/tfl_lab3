@@ -1,25 +1,56 @@
 package main
 
-//	⟨grammar⟩ ::= ⟨rule⟩ +
-//	⟨rule⟩ ::= ⟨nterm⟩->[a–z]⟨term⟩ ∗
+import "strings"
 
-type nterm struct {
+type Nterm struct {
 	//	⟨nterm⟩ ::= [A–Z][0–9] ∗
 
 	str string
 }
 
-type term struct {
-	//	⟨term⟩ ::= ⟨nterm⟩ | [a–z]
-
-	nt  nterm
-	str string
+func Nterm_init(str string) (n Nterm) {
+	n.str = str
+	return
 }
 
-type rule struct {
+type Term struct {
+	//	⟨term⟩ ::= ⟨nterm⟩ | [a–z]
+
+	nt  Nterm
+	str string //	[a-z]
+}
+
+func Term_init(str string) (t Term) {
+
+}
+
+type Rule struct {
+	//	⟨rule⟩ ::= ⟨nterm⟩->[a–z]⟨term⟩ ∗
+
+	nt  Nterm
+	str string //	[a-z]
+	t   Term
 }
 
 type CFG struct {
+	//	⟨grammar⟩ ::= ⟨rule⟩ +
+
+	rules []Rule
+}
+
+func parse_in(str string) {
+	strs := strings.Split(str, "/n")
+	for ind, s := range strs {
+		var (
+			nt  Nterm
+			t   Term
+			r   Rule
+			cfg CFG
+		)
+		lr := strings.Split(s, "->")
+		nt.str = lr[0]
+
+	}
 }
 
 func reg_analysis() {

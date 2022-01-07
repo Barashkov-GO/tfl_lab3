@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
+	_ "sort"
 	"strconv"
 	"strings"
 )
@@ -41,27 +43,37 @@ type Rule struct {
 
 	nt  Nterm
 	str string //	[a-z]
-	t   Term
+	t   []Term
 }
 
 func RuleInit(str string) (r Rule) {
 	lr := strings.Split(str, "->")
-	r.nt = NtermInit(lr[0][:len(lr[0])-1])
+	r.nt = NtermInit(lr[0])  // parse nterm ->
+	r.str = string(lr[1][0]) // parse [a-z]
+
 	lr[1] = lr[1][1:]
 
-	var indTerm int
-	var tempStr []byte
-	for i, c := range lr[1] {
-		isAZ, _ := regexp.MatchString("a-z", string(c))
-		if isAZ {
-			tempStr = append(tempStr, byte(c))
-		} else {
-			indTerm = i
-			break
+	for len(lr[1]) > 0 { // parse term
+		first := string(lr[1][0])
+		isAZ, _ := regexp.MatchString("[A-Z]", first)
+		if !isAZ { // if [a-z]
+			r.t = append(r.t, TermInit(first))
+			lr[1] = lr[1][1:]
+		} else { // if not [a-z] == if [A-Z]
+			indSep := 1
+			if len(lr[1]) == 1 {
+				r.t = append(r.t, TermInit(lr[1]))
+				break
+			}
+			flag := true
+			for flag { // while 0-9, moving forward to take the whole Term
+				flag, _ = regexp.MatchString("[0-9]", string(lr[1][indSep]))
+				indSep++
+			}
+			r.t = append(r.t, TermInit(lr[1][:indSep]))
+			lr[1] = lr[1][indSep:]
 		}
 	}
-	r.str = string(tempStr)
-	r.t = TermInit(lr[1][indTerm:])
 	return
 }
 
@@ -82,10 +94,55 @@ func CFGInit(str string) (cfg CFG) {
 func (cfg CFG) toString() (str string) {
 	str = "CFG:\n"
 	for _, r := range cfg.rules {
-		str += "\t" + r.nt.str + " -> " + r.str + r.t.nt.str + r.t.str + "\n"
+		str += "\t" + r.nt.str + " -> " + r.str
+		for _, v := range r.t {
+			str += v.nt.str + v.str
+		}
+		str += "\n"
 	}
 	str += "-----------------------\n"
 	return
+}
+
+type Tree struct {
+	value  string
+	subs   []*Tree
+	isTerm bool
+}
+
+func getTree(cfg CFG) (t *Tree) {
+	rules := cfg.rules
+	t.value = rules[0].nt.str
+	for _, r := range rules {
+		f, tr := treeSearch(r.nt, t)
+		if f {
+			t = tr
+		}
+		for _, s := range r.t {
+			var newTree Tree
+			newTree.value = s.nt.str
+			t.subs = append(t.subs, &newTree)
+		}
+	}
+	return
+}
+
+func printTree(t *Tree) {
+	fmt.Println(t.value)
+	for _, v := range t.subs {
+		printTree(v)
+	}
+}
+
+func treeSearch(nt Nterm, tr *Tree) (bool, *Tree) {
+	if tr.value != nt.str {
+		for _, v := range tr.subs {
+			treeSearch(nt, v)
+		}
+	} else {
+		return true, tr
+	}
+	return false, nil
 }
 
 func regAnalysis() {
@@ -151,6 +208,17 @@ func printNoInfo() {
 
 }
 
+func preparing(str string) (out string) {
+	strs := strings.Split(str, "\n")
+	sort.Strings(strs)
+	for _, s := range strs {
+		out += s + "\n"
+	}
+	out = out[:len(out)-1]
+	out = strings.ReplaceAll(out, " ", "")
+	return
+}
+
 func read(path string) (cfg CFG) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -160,7 +228,9 @@ func read(path string) (cfg CFG) {
 	defer file.Close()
 	data := make([]byte, 64)
 	n, _ := file.Read(data)
-	cfg = CFGInit(string(data[:n]))
+	cfg = CFGInit(preparing(string(data[:n])))
+	t := getTree(cfg)
+	printTree(t)
 	return
 }
 
@@ -171,7 +241,9 @@ func main() {
 
 	for i := 1; i <= TESTS_COUNT; i++ {
 		cfg := read("tests/test" + strconv.Itoa(i) + ".txt")
-		printNoInfo(recProbablyReg(checkMinWays(treeUnpacking(regAnalysis(cfg)))))
+		fmt.Println(cfg.toString())
+		//getTree(cfg)
+		//printNoInfo(recProbablyReg(checkMinWays(treeUnpacking(regAnalysis(cfg)))))
 	}
 	//
 

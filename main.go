@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"regexp"
 	"sort"
 	_ "sort"
@@ -41,9 +42,20 @@ func TermInit(str string) (t Term) {
 type Rule struct {
 	//	⟨rule⟩ ::= ⟨nterm⟩->[a–z]⟨term⟩ ∗
 
-	nt  Nterm
-	str string //	[a-z]
-	t   []Term
+	nt    Nterm
+	str   string //	[a-z]
+	t     []Term
+	isSLG bool // A -> aB | A -> a
+}
+
+func RuleSLG(r Rule) bool {
+	if len(r.t) == 0 {
+		return true
+	}
+	if len(r.t) == 1 && r.t[0].str == "" {
+		return true
+	}
+	return false
 }
 
 func RuleInit(str string) (r Rule) {
@@ -70,10 +82,11 @@ func RuleInit(str string) (r Rule) {
 				flag, _ = regexp.MatchString("[0-9]", string(lr[1][indSep]))
 				indSep++
 			}
-			r.t = append(r.t, TermInit(lr[1][:indSep]))
-			lr[1] = lr[1][indSep:]
+			r.t = append(r.t, TermInit(lr[1][:indSep-1]))
+			lr[1] = lr[1][indSep-1:]
 		}
 	}
+	r.isSLG = RuleSLG(r)
 	return
 }
 
@@ -106,46 +119,108 @@ func (cfg CFG) toString() (str string) {
 
 type Tree struct {
 	value  string
-	subs   []*Tree
+	subs   map[string]*Tree
 	isTerm bool
 }
 
-func getTree(cfg CFG) (t *Tree) {
-	rules := cfg.rules
-	t.value = rules[0].nt.str
-	for _, r := range rules {
-		f, tr := treeSearch(r.nt, t)
-		if f {
-			t = tr
+func getTree(cfg CFG, str string, baseStr string) (t Tree) {
+	t.value = str
+	t.subs = make(map[string]*Tree)
+	var inds []int
+	for i, r := range cfg.rules { // находим все индексы, правила по которым в левой части содержат данный нетерминал
+		if r.nt.str == str {
+			inds = append(inds, i)
 		}
-		for _, s := range r.t {
-			var newTree Tree
-			newTree.value = s.nt.str
-			t.subs = append(t.subs, &newTree)
+	}
+	for _, i := range inds { // идем по найденным индексам
+		rule := cfg.rules[i]
+		nT := getTree(cfg, rule.str, baseStr)
+		t.subs[rule.str] = &nT
+		for _, terms := range rule.t {
+			var searchStr string
+			if baseStr == terms.nt.str {
+				var nT Tree
+				nT.value = baseStr
+				t.subs[baseStr] = &nT
+
+				// добавить этот терм, все остальные как листья и сделать ретурн
+				for _, termsNew := range rule.t {
+					var nT Tree
+					if termsNew.nt.str != "" {
+						nT.value = termsNew.nt.str
+					} else {
+						nT.value = termsNew.str
+					}
+					t.subs[nT.value] = &nT
+				}
+				fmt.Println("Map for " + rule.nt.str)
+				for i, v := range t.subs {
+					fmt.Println(i + " - " + v.value)
+				}
+				return
+			}
+			if terms.nt.str != "" {
+				searchStr = terms.nt.str
+			} else {
+				searchStr = terms.str
+			}
+			nT := getTree(cfg, searchStr, baseStr)
+			t.subs[searchStr] = &nT
+
+			fmt.Println("Map for " + rule.nt.str)
+			for i, v := range t.subs {
+				fmt.Println(i + " - " + v.value)
+			}
+		}
+	}
+	return t
+}
+
+func treeSearch(t *Tree, str string) *Tree {
+	if t.value == str {
+		return t
+	}
+	for _, v := range t.subs {
+		treeSearch(v, str)
+	}
+	return t
+}
+
+func getChildren(str string, cfg CFG, m *map[string]bool) { // получить все достижимые нетерминалы из дерева данного нетерминала
+	for _, r := range cfg.rules {
+		if r.nt.str == str {
+			for _, nt := range r.t {
+				if len(nt.str) == 0 {
+					if !(*m)[nt.nt.str] {
+						(*m)[nt.nt.str] = true
+						getChildren(nt.nt.str, cfg, m)
+					}
+				}
+			}
 		}
 	}
 	return
 }
 
-func printTree(t *Tree) {
-	fmt.Println(t.value)
+func printTree(t Tree) (str map[string]string) {
+	str = make(map[string]string)
 	for _, v := range t.subs {
-		printTree(v)
-	}
-}
-
-func treeSearch(nt Nterm, tr *Tree) (bool, *Tree) {
-	if tr.value != nt.str {
-		for _, v := range tr.subs {
-			treeSearch(nt, v)
+		str[t.value+"->"+v.value+"\n"] = t.value + "->" + v.value + "\n"
+		for k, val := range printTree(*v) {
+			str[k] = val
 		}
-	} else {
-		return true, tr
 	}
-	return false, nil
+	return
 }
 
-func regAnalysis() {
+func getStringFromMap(str map[string]string) (out string) {
+	for _, v := range str {
+		out += v
+	}
+	return
+}
+
+func regAnalysis(cfg CFG) (out map[string]Nterm) {
 	/*
 		Анализ регулярных подмножеств грамматики.
 		Нахождение максимальных множеств M i нетерминалов
@@ -153,7 +228,56 @@ func regAnalysis() {
 		содержат только нетерминалы из M i , причём все эти
 		части праволинейны.
 	*/
+	out = make(map[string]Nterm)
+	for _, r := range cfg.rules {
+		if checkNtermNterm(cfg, r.nt) {
+			out[r.nt.str] = r.nt
+		}
+	}
+	for _, r := range cfg.rules {
+		if checkNterm(cfg, r.nt, out) {
+			out[r.nt.str] = r.nt
+		}
+	}
+	return
+}
 
+func printMapNterm(m map[string]Nterm) {
+	fmt.Println("M:")
+	for _, v := range m {
+		fmt.Print(v.str + " ")
+	}
+	fmt.Println("---------------")
+}
+
+func mapSearch(m map[string]Nterm, nterm Nterm) bool {
+	_, f := m[nterm.str]
+	return f
+}
+
+func checkNtermNterm(cfg CFG, nt Nterm) bool {
+	for _, r := range cfg.rules {
+		if r.nt.str == nt.str {
+			if len(r.t) != 0 {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func checkNterm(cfg CFG, nt Nterm, m map[string]Nterm) bool { // подходит ли нетерминал со всеми своими правилами под условия
+	for _, r := range cfg.rules {
+		if r.nt.str == nt.str {
+			if !r.isSLG {
+				return false
+			}
+			if len(r.t) == 1 && r.t[0].nt.str != nt.str && !mapSearch(m, r.t[0].nt) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func treeUnpacking() {
@@ -229,22 +353,51 @@ func read(path string) (cfg CFG) {
 	data := make([]byte, 64)
 	n, _ := file.Read(data)
 	cfg = CFGInit(preparing(string(data[:n])))
-	t := getTree(cfg)
-	printTree(t)
 	return
 }
 
-const TESTS_COUNT = 1
+func write(path string, res string) {
+	file, _ := os.Create(path)
+	fmt.Println(res)
+	file.Write([]byte("digraph G {\n"))
+	file.Write([]byte(res))
+	file.Write([]byte("\n}"))
+	defer file.Close()
+}
+
+func graphViz(i int, t Tree) {
+	write("results/test"+strconv.Itoa(i)+"_"+t.value+".gv", getStringFromMap(printTree(t)))
+	cmd := exec.Command("dot",
+		"-Tpng",
+		"results/test"+strconv.Itoa(i)+"_"+t.value+".gv",
+		"-o",
+		"results/images/test"+strconv.Itoa(i)+"_"+t.value+".png")
+	err := cmd.Run()
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+const TestsCount = 4
 
 func main() {
-	//var str string // from test file
-
-	for i := 1; i <= TESTS_COUNT; i++ {
+	for i := 4; i <= TestsCount; i++ {
 		cfg := read("tests/test" + strconv.Itoa(i) + ".txt")
-		fmt.Println(cfg.toString())
-		//getTree(cfg)
-		//printNoInfo(recProbablyReg(checkMinWays(treeUnpacking(regAnalysis(cfg)))))
-	}
-	//
+		m := make(map[string]bool)
+		getChildren("S", cfg, &m)
+		for v, _ := range m {
+			t1 := getTree(cfg, v, v)
+			//fmt.Println("Nonterminal tree for: " + t1.value)
+			//for i, v := range t1.subs {
+			//	fmt.Println(i + " - " + v.value)
+			//}
+			graphViz(i, t1)
+		}
+		//fmt.Println("Children nonterminals for " + "S" + ":\n")
+		//for v, _ := range m {
+		//	fmt.Println("\t" + v)
+		//}
 
+		printMapNterm(regAnalysis(cfg))
+	}
 }

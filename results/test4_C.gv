@@ -1,0 +1,22 @@
+digraph G {
+	0[label="C"]
+	1[label="a"]
+	6[label="A"]
+	2[label="b"]
+	5[label="B"]
+	3[label="c"]
+	4[label="C"]
+	5->3
+	5->4
+	6->2
+	6->5
+	9[label="B"]
+	7[label="c"]
+	8[label="C"]
+	9->7
+	9->8
+	0->1
+	0->6
+	0->9
+
+}

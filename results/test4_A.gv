@@ -1,0 +1,18 @@
+digraph G {
+	0[label="A"]
+	1[label="b"]
+	7[label="B"]
+	2[label="c"]
+	6[label="C"]
+	3[label="a"]
+	4[label="A"]
+	5[label="B"]
+	6->3
+	6->4
+	6->5
+	7->2
+	7->6
+	0->1
+	0->7
+
+}

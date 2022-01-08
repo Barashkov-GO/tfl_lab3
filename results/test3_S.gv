@@ -1,0 +1,8 @@
+digraph G {
+	0[label="S"]
+	1[label="a"]
+	2[label="S"]
+	0->1
+	0->2
+
+}

@@ -119,13 +119,14 @@ func (cfg CFG) toString() (str string) {
 
 type Tree struct {
 	value  string
-	subs   map[string]*Tree
-	isTerm bool
+	subs   []*Tree
+	number int
 }
+
+var cnt int
 
 func getTree(cfg CFG, str string, baseStr string) (t Tree) {
 	t.value = str
-	t.subs = make(map[string]*Tree)
 	var inds []int
 	for i, r := range cfg.rules { // находим все индексы, правила по которым в левой части содержат данный нетерминал
 		if r.nt.str == str {
@@ -135,42 +136,41 @@ func getTree(cfg CFG, str string, baseStr string) (t Tree) {
 	for _, i := range inds { // идем по найденным индексам
 		rule := cfg.rules[i]
 		nT := getTree(cfg, rule.str, baseStr)
-		t.subs[rule.str] = &nT
-		for _, terms := range rule.t {
+		nT.number = cnt + 1
+		cnt++
+		t.subs = append(t.subs, &nT)
+		for _, terms := range rule.t { // идем по термам из правой части правила
 			var searchStr string
-			if baseStr == terms.nt.str {
-				var nT Tree
-				nT.value = baseStr
-				t.subs[baseStr] = &nT
-
+			//f := false
+			//for _, termsNew := range rule.t {
+			//	if baseStr == termsNew.nt.str {
+			//		f = true
+			//	}
+			//}
+			if baseStr == terms.nt.str { // если дошли до итерации накачки
 				// добавить этот терм, все остальные как листья и сделать ретурн
-				for _, termsNew := range rule.t {
+				for _, termsNew := range rule.t { // записываем детей
 					var nT Tree
 					if termsNew.nt.str != "" {
 						nT.value = termsNew.nt.str
 					} else {
 						nT.value = termsNew.str
 					}
-					t.subs[nT.value] = &nT
-				}
-				fmt.Println("Map for " + rule.nt.str)
-				for i, v := range t.subs {
-					fmt.Println(i + " - " + v.value)
+					nT.number = cnt + 1
+					cnt++
+					t.subs = append(t.subs, &nT)
 				}
 				return
 			}
-			if terms.nt.str != "" {
+			if terms.nt.str != "" { // если в терме есть нетерминал
 				searchStr = terms.nt.str
-			} else {
+			} else { // если в терме терминал
 				searchStr = terms.str
 			}
 			nT := getTree(cfg, searchStr, baseStr)
-			t.subs[searchStr] = &nT
-
-			fmt.Println("Map for " + rule.nt.str)
-			for i, v := range t.subs {
-				fmt.Println(i + " - " + v.value)
-			}
+			nT.number = cnt + 1
+			cnt++
+			t.subs = append(t.subs, &nT)
 		}
 	}
 	return t
@@ -202,20 +202,38 @@ func getChildren(str string, cfg CFG, m *map[string]bool) { // получить 
 	return
 }
 
-func printTree(t Tree) (str map[string]string) {
-	str = make(map[string]string)
+func printTree(t Tree) (str []string) {
 	for _, v := range t.subs {
-		str[t.value+"->"+v.value+"\n"] = t.value + "->" + v.value + "\n"
-		for k, val := range printTree(*v) {
-			str[k] = val
+		str = append(str, "\t"+strconv.Itoa(t.number)+"[label=\""+t.value+"\"]\n")
+		str = append(str, "\t"+strconv.Itoa(v.number)+"[label=\""+v.value+"\"]\n")
+		for _, val := range printTree(*v) {
+			str = append(str, val)
+		}
+	}
+	for _, v := range t.subs {
+		str = append(str, "\t"+strconv.Itoa(t.number)+"->"+strconv.Itoa(v.number)+"\n")
+		for _, val := range printTree(*v) {
+			str = append(str, val)
 		}
 	}
 	return
 }
 
-func getStringFromMap(str map[string]string) (out string) {
+func getStringFromMap(str []string) (out string) {
+	unique := make(map[string]int)
 	for _, v := range str {
-		out += v
+		a, f := unique[v]
+		if !f {
+			unique[v] = 1
+		} else {
+			unique[v] = a + 1
+		}
+	}
+	for _, v := range str {
+		if unique[v] != 0 {
+			out += v
+			unique[v] = 0
+		}
 	}
 	return
 }
@@ -378,14 +396,15 @@ func graphViz(i int, t Tree) {
 	}
 }
 
-const TestsCount = 4
+const TestsCount = 5
 
 func main() {
-	for i := 4; i <= TestsCount; i++ {
+	for i := 1; i <= TestsCount; i++ {
 		cfg := read("tests/test" + strconv.Itoa(i) + ".txt")
 		m := make(map[string]bool)
 		getChildren("S", cfg, &m)
 		for v, _ := range m {
+			cnt = 0
 			t1 := getTree(cfg, v, v)
 			//fmt.Println("Nonterminal tree for: " + t1.value)
 			//for i, v := range t1.subs {

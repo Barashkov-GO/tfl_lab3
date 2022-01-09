@@ -144,7 +144,7 @@ func isInPath(nonTerm string) bool {
 	return false
 }
 
-func getTree(cfg CFG, nonTerm string, baseNonTerm string, F1 *[]string, F2 *[]string) (t Tree) {
+func getTree(cfg CFG, nonTerm string, baseNonTerm string, F1 *[]Term, F2 *[]Term) (t Tree) {
 	t.value = nonTerm
 	var indices []int
 	for i, r := range cfg.rules { // находим все индексы, правила по которым в левой части содержат данный нетерминал
@@ -155,19 +155,27 @@ func getTree(cfg CFG, nonTerm string, baseNonTerm string, F1 *[]string, F2 *[]st
 	for _, ind := range indices { // идем по всем правилам данного нетерминала
 		rule := cfg.rules[ind]
 		t.subs = appendTree(t.subs, rule.str) // добавляем первый терминал как листик
-		*F1 = append(*F1, rule.str)
+		var tN Term
+		tN.str = rule.str
+		*F1 = append(*F1, tN)
 		for _, term := range rule.t { // идем по термам
 			if term.str != "" { // если встретили терминал
 				t.subs = appendTree(t.subs, term.str)
 				if !wasEnding {
-					*F1 = append(*F1, term.str)
+					var tN Term
+					tN.str = term.str
+					*F1 = append(*F1, tN)
 				} else {
-					*F2 = append(*F2, term.str)
+					var tN Term
+					tN.nt.str = term.str
+					*F2 = append(*F2, tN)
 				}
 			} else { // если встретили нетерминал
 				if term.nt.str == baseNonTerm { // если нетерминал начальный
 					if wasEnding {
-						*F2 = append(*F2, term.nt.str)
+						var tN Term
+						tN.nt.str = term.nt.str
+						*F2 = append(*F2, tN)
 					}
 					wasEnding = true
 					t.subs = appendTree(t.subs, term.nt.str)
@@ -185,7 +193,9 @@ func getTree(cfg CFG, nonTerm string, baseNonTerm string, F1 *[]string, F2 *[]st
 							pathToRoot = append(pathToRoot, term.nt.str)
 						}
 					} else { // если начальный нетерминал уже нашли
-						*F2 = append(*F2, term.nt.str)
+						var tN Term
+						tN.nt.str = term.nt.str
+						*F2 = append(*F2, tN)
 						t.subs = appendTree(t.subs, term.nt.str)
 						//pathToRoot = append(pathToRoot, term.nt.str)
 					}
@@ -195,6 +205,44 @@ func getTree(cfg CFG, nonTerm string, baseNonTerm string, F1 *[]string, F2 *[]st
 
 	}
 	return t
+}
+
+func checkF2(F2 []Term, m map[string]Nterm) bool {
+	for _, val := range F2 {
+		v := val.nt.str
+		f1, _ := regexp.MatchString("[a-z]", v)
+		if !f1 {
+			_, f2 := m[v]
+			if !f2 {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func checkF1F2Plus(cfg CFG, F1 []Term, F2 []Term) bool {
+	if len(F2) == 0 {
+		return false
+	}
+	if F2[0].str != "" {
+		if F1[0].str != F2[0].str {
+			return false
+		} else {
+			return checkF1F2Plus(cfg, F1[1:], F2[1:])
+		}
+	} else {
+		for _, r := range cfg.rules {
+			if r.nt.str == F2[0].nt.str {
+				if r.t[0].str == F1[0].str {
+					F1 = F1[1:]
+					F2 = append(r.t, F2...)
+					return checkF1F2Plus(cfg, F1, F2)
+				}
+			}
+		}
+	}
+	return true
 }
 
 func printTreeArray(F []string) {
@@ -286,14 +334,6 @@ func regAnalysis(cfg CFG) (out map[string]Nterm) {
 		}
 	}
 	return
-}
-
-func printMapNterm(m map[string]Nterm) {
-	fmt.Println("M:")
-	for _, v := range m {
-		fmt.Print(v.str + " ")
-	}
-	fmt.Println("---------------")
 }
 
 func mapSearch(m map[string]Nterm, nterm Nterm) bool {
@@ -404,7 +444,6 @@ func read(path string) (cfg CFG) {
 
 func write(path string, res string) {
 	file, _ := os.Create(path)
-	fmt.Println(res)
 	file.Write([]byte("digraph G {\n"))
 	file.Write([]byte(res))
 	file.Write([]byte("\n}"))
@@ -424,34 +463,33 @@ func graphViz(i int, t Tree) {
 	}
 }
 
-const TestsCount = 6
-const TestsStart = 4
+const TestsCount = 5
+const TestsStart = 1
 
 func main() {
 	for i := TestsStart; i <= TestsCount; i++ {
+		fmt.Println("TEST " + strconv.Itoa(i))
 		cfg := read("tests/test" + strconv.Itoa(i) + ".txt")
 		m := make(map[string]bool)
 		getChildren("S", cfg, &m)
 		for v, _ := range m {
 			cnt = 0
-			var F1, F2 []string
+			var F1, F2 []Term
 			wasEnding = false
 			pathToRoot = pathToRoot[0:0]
 			t1 := getTree(cfg, v, v, &F1, &F2)
-			printTreeArray(F1)
-			printTreeArray(F2)
-			fmt.Println(pathToRoot)
-			//fmt.Println("Nonterminal tree for: " + t1.value)
-			//for i, v := range t1.subs {
-			//	fmt.Println(i + " - " + v.value)
-			//}
+			//printTreeArray(F1)
+			//printTreeArray(F2)
+			//fmt.Println(F2, "\t-\t", checkF2(F2, regAnalysis(cfg)))
+			if checkF2(F2, regAnalysis(cfg)) {
+				if !checkF1F2Plus(cfg, F1, F2) {
+					fmt.Println(
+						"Дерево накачки нетерминала " +
+							v +
+							" подозрительно на нерегулярную накачку")
+				}
+			}
 			graphViz(i, t1)
 		}
-		//fmt.Println("Children nonterminals for " + "S" + ":\n")
-		//for v, _ := range m {
-		//	fmt.Println("\t" + v)
-		//}
-
-		printMapNterm(regAnalysis(cfg))
 	}
 }

@@ -1,4 +1,4 @@
 S -> tA
 A -> bB
-B -> cC
-C -> aAB
+B -> cCA
+C -> a

@@ -1,4 +1,4 @@
-S -> b
+K -> b
 S -> aM
-S -> b
-M -> a
+S -> bM
+M -> aK

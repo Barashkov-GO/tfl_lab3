@@ -123,57 +123,85 @@ type Tree struct {
 	number int
 }
 
-var cnt int
+var cnt = 0
+var wasEnding = false
+var pathToRoot []string
 
-func getTree(cfg CFG, str string, baseStr string) (t Tree) {
-	t.value = str
-	var inds []int
-	for i, r := range cfg.rules { // находим все индексы, правила по которым в левой части содержат данный нетерминал
-		if r.nt.str == str {
-			inds = append(inds, i)
+func appendTree(subs []*Tree, value string) []*Tree {
+	var nT Tree
+	nT.value = value
+	nT.number = cnt + 1
+	cnt++
+	return append(subs, &nT)
+}
+
+func isInPath(nonTerm string) bool {
+	for _, v := range pathToRoot {
+		if v == nonTerm {
+			return true
 		}
 	}
-	for _, i := range inds { // идем по найденным индексам
-		rule := cfg.rules[i]
-		nT := getTree(cfg, rule.str, baseStr)
-		nT.number = cnt + 1
-		cnt++
-		t.subs = append(t.subs, &nT)
-		for _, terms := range rule.t { // идем по термам из правой части правила
-			var searchStr string
-			//f := false
-			//for _, termsNew := range rule.t {
-			//	if baseStr == termsNew.nt.str {
-			//		f = true
-			//	}
-			//}
-			if baseStr == terms.nt.str { // если дошли до итерации накачки
-				// добавить этот терм, все остальные как листья и сделать ретурн
-				for _, termsNew := range rule.t { // записываем детей
-					var nT Tree
-					if termsNew.nt.str != "" {
-						nT.value = termsNew.nt.str
-					} else {
-						nT.value = termsNew.str
-					}
-					nT.number = cnt + 1
-					cnt++
-					t.subs = append(t.subs, &nT)
-				}
-				return
-			}
-			if terms.nt.str != "" { // если в терме есть нетерминал
-				searchStr = terms.nt.str
-			} else { // если в терме терминал
-				searchStr = terms.str
-			}
-			nT := getTree(cfg, searchStr, baseStr)
-			nT.number = cnt + 1
-			cnt++
-			t.subs = append(t.subs, &nT)
+	return false
+}
+
+func getTree(cfg CFG, nonTerm string, baseNonTerm string, F1 *[]string, F2 *[]string) (t Tree) {
+	t.value = nonTerm
+	var indices []int
+	for i, r := range cfg.rules { // находим все индексы, правила по которым в левой части содержат данный нетерминал
+		if r.nt.str == nonTerm {
+			indices = append(indices, i)
 		}
+	}
+	for _, ind := range indices { // идем по всем правилам данного нетерминала
+		rule := cfg.rules[ind]
+		t.subs = appendTree(t.subs, rule.str) // добавляем первый терминал как листик
+		*F1 = append(*F1, rule.str)
+		for _, term := range rule.t { // идем по термам
+			if term.str != "" { // если встретили терминал
+				t.subs = appendTree(t.subs, term.str)
+				if !wasEnding {
+					*F1 = append(*F1, term.str)
+				} else {
+					*F2 = append(*F2, term.str)
+				}
+			} else { // если встретили нетерминал
+				if term.nt.str == baseNonTerm { // если нетерминал начальный
+					if wasEnding {
+						*F2 = append(*F2, term.nt.str)
+					}
+					wasEnding = true
+					t.subs = appendTree(t.subs, term.nt.str)
+					pathToRoot = append(pathToRoot, term.nt.str)
+				} else { // если нетерминал не начальный
+					if isInPath(term.nt.str) {
+						return
+					}
+					if !wasEnding { // если начальный нетерминал еще не нашли
+						nT := getTree(cfg, term.nt.str, baseNonTerm, F1, F2)
+						nT.number = cnt + 1
+						cnt++
+						t.subs = append(t.subs, &nT)
+						if wasEnding {
+							pathToRoot = append(pathToRoot, term.nt.str)
+						}
+					} else { // если начальный нетерминал уже нашли
+						*F2 = append(*F2, term.nt.str)
+						t.subs = appendTree(t.subs, term.nt.str)
+						//pathToRoot = append(pathToRoot, term.nt.str)
+					}
+				}
+			}
+		}
+
 	}
 	return t
+}
+
+func printTreeArray(F []string) {
+	fmt.Println("\tF\n")
+	for _, v := range F {
+		fmt.Println("\t\t" + v)
+	}
 }
 
 func treeSearch(t *Tree, str string) *Tree {
@@ -396,16 +424,23 @@ func graphViz(i int, t Tree) {
 	}
 }
 
-const TestsCount = 5
+const TestsCount = 6
+const TestsStart = 4
 
 func main() {
-	for i := 1; i <= TestsCount; i++ {
+	for i := TestsStart; i <= TestsCount; i++ {
 		cfg := read("tests/test" + strconv.Itoa(i) + ".txt")
 		m := make(map[string]bool)
 		getChildren("S", cfg, &m)
 		for v, _ := range m {
 			cnt = 0
-			t1 := getTree(cfg, v, v)
+			var F1, F2 []string
+			wasEnding = false
+			pathToRoot = pathToRoot[0:0]
+			t1 := getTree(cfg, v, v, &F1, &F2)
+			printTreeArray(F1)
+			printTreeArray(F2)
+			fmt.Println(pathToRoot)
 			//fmt.Println("Nonterminal tree for: " + t1.value)
 			//for i, v := range t1.subs {
 			//	fmt.Println(i + " - " + v.value)

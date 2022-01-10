@@ -1,20 +1,28 @@
 digraph G {
 	0[label="A"]
 	1[label="b"]
-	8[label="B"]
+	3[label="K"]
 	2[label="a"]
-	5[label="C"]
-	3[label="b"]
-	4[label="A"]
-	5->3
-	5->4
-	6[label="b"]
-	7[label="A"]
-	8->2
-	8->5
-	8->6
-	8->7
+	3->2
+	4[label="b"]
+	12[label="L"]
+	5[label="a"]
+	11[label="B"]
+	6[label="a"]
+	9[label="C"]
+	7[label="b"]
+	8[label="A"]
+	9->7
+	9->8
+	10[label="b"]
+	11->6
+	11->9
+	11->10
+	12->5
+	12->11
 	0->1
-	0->8
+	0->3
+	0->4
+	0->12
 
 }

@@ -221,45 +221,106 @@ func checkF2(F2 []Term, m map[string]Nterm) bool {
 	return true
 }
 
-func checkF1F2Plus(cfg CFG, F1 []Term, F2 []Term) bool {
+func checkF1F2Plus(cfg CFG, F1 []Term, F2 []Term, F2Start []Term) bool {
 	if len(F2) == 0 {
-		return false
+		if len(F2Start) != 0 {
+			return checkF1F2Plus(cfg, F1, F2Start, F2Start)
+		} else {
+			return false
+		}
 	}
 	if F2[0].str != "" {
 		if F1[0].str != F2[0].str {
 			return false
 		} else {
-			return checkF1F2Plus(cfg, F1[1:], F2[1:])
+			return checkF1F2Plus(cfg, F1[1:], F2[1:], F2Start)
 		}
 	} else {
+		f := false
 		for _, r := range cfg.rules {
 			if r.nt.str == F2[0].nt.str {
 				if r.t[0].str == F1[0].str {
 					F1 = F1[1:]
 					F2 = append(r.t, F2...)
-					return checkF1F2Plus(cfg, F1, F2)
+					if checkF1F2Plus(cfg, F1, F2, F2Start) {
+						f = true
+					}
 				}
+			}
+		}
+		if !f {
+			return false
+		}
+	}
+	return true
+}
+
+var path map[string]string
+
+// 3
+func getAllTerminalStrings(cfg CFG, nonTerm string, out *[]string) bool {
+	var F1 []Term
+	var F2 []Term
+	t := getTree(cfg, nonTerm, nonTerm, &F1, &F2)
+	for _, ch := range t.subs {
+		f, _ := regexp.MatchString("[a-z]", ch.value)
+		if f {
+			*out = append(*out, ch.value)
+		} else {
+			_, b := path[ch.value]
+			if b {
+				return false
+			} else {
+				path[ch.value] = ch.value
+				return getAllTerminalStrings(cfg, ch.value, out)
 			}
 		}
 	}
 	return true
 }
 
-func printTreeArray(F []string) {
-	fmt.Println("\tF\n")
-	for _, v := range F {
-		fmt.Println("\t\t" + v)
+// 4
+func checkRegular(cfg CFG, nonTerm string, reg *[]string, probablyReg *[]string) {
+	/*
+		Рекурсивно замыкаем множества регулярных и возможно
+		регулярных нетерминалов.
+		Если при переписывании
+		нетерминала B все правые части содержат только
+		регулярные нетерминалы, он регулярен. Если регулярные
+		и возможно регулярные — возможно регулярен.
+	*/
+	fReg := true
+	fProbablyReg := true
+	for _, r := range cfg.rules {
+		if r.nt.str == nonTerm {
+			for _, t := range r.t {
+				fReg2 := false
+				fProbablyReg2 := false
+				for _, regs := range *reg {
+					if regs == t.nt.str {
+						fReg2 = true
+					}
+				}
+				if !fReg2 {
+					fReg = false
+				}
+				for _, regs := range *probablyReg {
+					if regs == t.nt.str {
+						fProbablyReg2 = true
+					}
+				}
+				if !fProbablyReg2 {
+					fProbablyReg = false
+				}
+			}
+		}
 	}
-}
-
-func treeSearch(t *Tree, str string) *Tree {
-	if t.value == str {
-		return t
+	if fProbablyReg {
+		*probablyReg = append(*probablyReg, nonTerm)
 	}
-	for _, v := range t.subs {
-		treeSearch(v, str)
+	if fReg {
+		*reg = append(*reg, nonTerm)
 	}
-	return t
 }
 
 func getChildren(str string, cfg CFG, m *map[string]bool) { // получить все достижимые нетерминалы из дерева данного нетерминала
@@ -366,58 +427,6 @@ func checkNterm(cfg CFG, nt Nterm, m map[string]Nterm) bool { // подходи�
 	return true
 }
 
-func treeUnpacking() {
-	/*
-		Развёртка дерева левосторонних разборов исходной
-		грамматики. Для каждого достижимого из стартового
-		нетерминала A строим дерево развёртки до первых
-		накачек вида Φ 1 AΦ 2 , где Φ 1 — терминальная строка.
-		Если оказалось, что Φ 2 состоит только из терминалов или
-		регулярных нетерминалов (входящих в какое-нибудь из
-		M i ), тогда проверяем, входит ли Φ 1 в язык Φ +
-		2 . Если не
-		входит, тогда выводим дерево накачки нетерминала A как
-		подозрительное на нерегулярную накачку.
-	*/
-
-}
-
-func checkMinWays() {
-	/*
-		Если Φ 1 ∈ L(Φ +
-		2 ), тогда проверяем все кратчайшие
-		конечные пути развёртки A до терминальной строки на
-		вхождение в L(Φ +
-		2 ). Если построенные на них строки
-		также входят в L(Φ +
-		2 ), сообщаем о возможной
-		регулярности языка A. Если A ∈ M i , сразу сообщаем о
-		его регулярности.
-	*/
-
-}
-
-func recProbablyReg() {
-	/*
-		Рекурсивно замыкаем множества регулярных и возможно
-		регулярных нетерминалов. Если при переписывании
-		нетерминала B все правые части содержат только
-		регулярные нетерминалы, он регулярен. Если регулярные
-		и возможно регулярные — возможно регулярен.
-	*/
-
-}
-
-func printNoInfo() {
-	/*
-		Если рекурсивное замыкание не дало никакой
-		информации об исходном нетерминале S, но не было и
-		подозрительных нерегулярных накачек S, сообщаем, что
-		регулярность языка не удалось определить.
-	*/
-
-}
-
 func preparing(str string) (out string) {
 	strs := strings.Split(str, "\n")
 	sort.Strings(strs)
@@ -463,33 +472,87 @@ func graphViz(i int, t Tree) {
 	}
 }
 
+func printAnswer(r []string, nr []string, pr []string) {
+	m := make(map[string]bool)
+	for _, v := range r {
+		m[v] = true
+		fmt.Println("Язык " + v + " регулярен")
+	}
+	for _, v := range pr {
+		_, b := m[v]
+		if !b {
+			fmt.Println("Язык " + v + " возможно регулярен")
+		}
+	}
+	for _, v := range nr {
+		_, b := m[v]
+		if !b {
+			fmt.Println(
+				"Дерево накачки нетерминала " +
+					v +
+					" подозрительно на нерегулярную накачку")
+		}
+	}
+}
+
 const TestsCount = 5
 const TestsStart = 1
 
 func main() {
 	for i := TestsStart; i <= TestsCount; i++ {
+		var (
+			regular            []string
+			probablyNonRegular []string
+			probablyRegular    []string
+		)
+
 		fmt.Println("TEST " + strconv.Itoa(i))
 		cfg := read("tests/test" + strconv.Itoa(i) + ".txt")
-		m := make(map[string]bool)
-		getChildren("S", cfg, &m)
-		for v, _ := range m {
+		childrenS := make(map[string]bool)
+		getChildren("S", cfg, &childrenS)
+		for v, _ := range childrenS {
 			cnt = 0
 			var F1, F2 []Term
 			wasEnding = false
 			pathToRoot = pathToRoot[0:0]
 			t1 := getTree(cfg, v, v, &F1, &F2)
-			//printTreeArray(F1)
-			//printTreeArray(F2)
-			//fmt.Println(F2, "\t-\t", checkF2(F2, regAnalysis(cfg)))
 			if checkF2(F2, regAnalysis(cfg)) {
-				if !checkF1F2Plus(cfg, F1, F2) {
-					fmt.Println(
-						"Дерево накачки нетерминала " +
-							v +
-							" подозрительно на нерегулярную накачку")
+				if !checkF1F2Plus(cfg, F1, F2, F2) { // если Ф1 не входит в Ф2+
+					probablyNonRegular = append(probablyNonRegular, v)
+				} else { // если Ф1 входит в Ф2+
+					var str []string
+					path = make(map[string]string)
+					pathToRoot = pathToRoot[0:0]
+					getAllTerminalStrings(cfg, v, &str)
+					var FF1 []Term
+					for _, c := range str {
+						var T Term
+						T.str = c
+						FF1 = append(FF1, T)
+					}
+					if checkF1F2Plus(cfg, FF1, F2, F2) {
+						reg := regAnalysis(cfg)
+						_, b := reg[v]
+						if b {
+							regular = append(regular, v)
+						} else {
+							probablyRegular = append(probablyRegular, v)
+						}
+					}
 				}
 			}
 			graphViz(i, t1)
 		}
+		for v, _ := range childrenS {
+			checkRegular(cfg, v, &regular, &probablyRegular)
+		}
+		l1 := len(regular)
+		l2 := len(probablyRegular)
+		l3 := len(probablyNonRegular)
+		checkRegular(cfg, "S", &regular, &probablyRegular)
+		if l1 == len(regular) && l2 == len(probablyRegular) && l3 == 0 {
+			fmt.Println("Регулярность языка не удалось определить")
+		}
+		printAnswer(regular, probablyNonRegular, probablyRegular)
 	}
 }

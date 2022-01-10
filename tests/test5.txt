@@ -1,4 +1,7 @@
 S -> aB
-B -> aCbA
+B -> aCb
 C -> bA
-A -> bB
+A -> bL
+A -> bK
+K -> a
+L -> aB

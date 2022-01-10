@@ -10,5 +10,7 @@
 ### For launch program
 1. create directories _tests/_, _results/_, _results/images/_ in project directory
 2. **_go run main.go_**
+3. You can see results in terminal and results/ directory
 
-_You can add your tests into tests/_
+_You can add your tests into tests/ and change constant TestsCount in program_
+

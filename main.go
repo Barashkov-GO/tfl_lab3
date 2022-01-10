@@ -254,22 +254,40 @@ func checkF1F2Plus(cfg CFG, F1 []Term, F2 []Term, F2Start []Term) bool {
 
 var path map[string]string
 
+func getAllTerminalStrings(cfg CFG, indBegin int, nonTerm string, out *map[string]string) bool {
+	var cfgNew CFG
+	for i := indBegin; i < len(cfg.rules); i++ {
+		cfgNew.rules = append(cfgNew.rules, cfg.rules[i])
+	}
+	for i := 0; i < indBegin; i++ {
+		cfgNew.rules = append(cfgNew.rules, cfg.rules[i])
+	}
+	var outStr string
+	f := getTerminalString(cfgNew, nonTerm, &outStr)
+
+	_, b := (*out)[outStr]
+	if !b {
+		(*out)[outStr] = outStr
+	}
+	return f
+}
+
 // 3
-func getAllTerminalStrings(cfg CFG, nonTerm string, out *[]string) bool {
+func getTerminalString(cfg CFG, nonTerm string, out *string) bool {
 	var F1 []Term
 	var F2 []Term
 	t := getTree(cfg, nonTerm, nonTerm, &F1, &F2)
 	for _, ch := range t.subs {
 		f, _ := regexp.MatchString("[a-z]", ch.value)
 		if f {
-			*out = append(*out, ch.value)
+			*out += ch.value
 		} else {
 			_, b := path[ch.value]
 			if b {
 				return false
 			} else {
 				path[ch.value] = ch.value
-				return getAllTerminalStrings(cfg, ch.value, out)
+				return getTerminalString(cfg, ch.value, out)
 			}
 		}
 	}
@@ -514,25 +532,43 @@ func main() {
 			nonTermPath = nonTermPath[0:0]
 			t1 := getTree(cfg, v, v, &F1, &F2)
 			if checkF2(F2, regAnalysis(cfg)) {
-				if !checkF1F2Plus(cfg, F1, F2, F2) { // если Ф1 не входит в Ф2+
+				if !checkF1F2Plus(cfg, F1, F2, F2) {
+					// если Ф1 не входит в Ф2+
 					probablyNonRegular = append(probablyNonRegular, v)
-				} else { // если Ф1 входит в Ф2+
-					var str []string
+				} else {
+					// если Ф1 входит в Ф2+
+					var str map[string]string
 					path = make(map[string]string)
 					nonTermPath = nonTermPath[0:0]
-					getAllTerminalStrings(cfg, v, &str)
-					var FF1 []Term
-					for _, c := range str { // делаем из массива строк массив термов
-						var T Term
-						T.str = c
-						FF1 = append(FF1, T)
+					for j := 0; j < len(cfg.rules); j++ {
+						// перебираем все циклические сдвиги правил,
+						// чтобы собрать все терминальные строки
+						getAllTerminalStrings(cfg, 0, v, &str)
 					}
-					if checkF1F2Plus(cfg, FF1, F2, F2) { // если новый Ф1 входит в Ф2+
+					isTerminalStringsInF2 := true
+					for a, _ := range str {
+						// перебираем все терминальные строки из получившейся мапы
+						var FF1 []Term
+						for _, c := range a {
+							// делаем из строки массив термов
+							var T Term
+							T.str = string(c)
+							FF1 = append(FF1, T)
+						}
+						if !checkF1F2Plus(cfg, FF1, F2, F2) {
+							// если какой либо из новых Ф1 не входит в Ф2+
+							isTerminalStringsInF2 = false
+						}
+					}
+					if isTerminalStringsInF2 {
+						// если все новые Ф1 входят в Ф2+, то возможна регулярности
 						reg := regAnalysis(cfg)
 						_, b := reg[v]
-						if b { // если нетерминал есть в множестве Mi
+						if b {
+							// если нетерминал есть в множестве Mi, то регулярен
 							regular = append(regular, v)
 						} else {
+							// если нетерминала нет в множестве Mi, то возможно регулярен
 							probablyRegular = append(probablyRegular, v)
 						}
 					}

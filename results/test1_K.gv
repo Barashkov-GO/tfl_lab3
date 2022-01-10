@@ -1,0 +1,6 @@
+digraph G {
+	0[label="K"]
+	1[label="b"]
+	0->1
+
+}

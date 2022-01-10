@@ -125,7 +125,7 @@ type Tree struct {
 
 var cnt = 0
 var wasEnding = false
-var pathToRoot []string
+var nonTermPath []string
 
 func appendTree(subs []*Tree, value string) []*Tree {
 	var nT Tree
@@ -136,7 +136,7 @@ func appendTree(subs []*Tree, value string) []*Tree {
 }
 
 func isInPath(nonTerm string) bool {
-	for _, v := range pathToRoot {
+	for _, v := range nonTermPath {
 		if v == nonTerm {
 			return true
 		}
@@ -171,33 +171,30 @@ func getTree(cfg CFG, nonTerm string, baseNonTerm string, F1 *[]Term, F2 *[]Term
 					*F2 = append(*F2, tN)
 				}
 			} else { // если встретили нетерминал
-				if term.nt.str == baseNonTerm { // если нетерминал начальный
-					if wasEnding {
-						var tN Term
-						tN.nt.str = term.nt.str
-						*F2 = append(*F2, tN)
-					}
-					wasEnding = true
+				if isInPath(term.nt.str) { // если по этому нетерминалу уже строили поддерево
 					t.subs = appendTree(t.subs, term.nt.str)
-					pathToRoot = append(pathToRoot, term.nt.str)
-				} else { // если нетерминал не начальный
-					if isInPath(term.nt.str) {
-						return
-					}
-					if !wasEnding { // если начальный нетерминал еще не нашли
-						nT := getTree(cfg, term.nt.str, baseNonTerm, F1, F2)
-						nT.number = cnt + 1
-						cnt++
-						t.subs = append(t.subs, &nT)
+				} else {
+					nonTermPath = append(nonTermPath, term.nt.str)
+					if term.nt.str == baseNonTerm { // если нетерминал начальный
 						if wasEnding {
-							pathToRoot = append(pathToRoot, term.nt.str)
+							var tN Term
+							tN.nt.str = term.nt.str
+							*F2 = append(*F2, tN)
 						}
-					} else { // если начальный нетерминал уже нашли
-						var tN Term
-						tN.nt.str = term.nt.str
-						*F2 = append(*F2, tN)
+						wasEnding = true
 						t.subs = appendTree(t.subs, term.nt.str)
-						//pathToRoot = append(pathToRoot, term.nt.str)
+					} else { // если нетерминал не начальный
+						if !wasEnding { // если начальный нетерминал еще не нашли
+							nT := getTree(cfg, term.nt.str, baseNonTerm, F1, F2)
+							nT.number = cnt + 1
+							cnt++
+							t.subs = append(t.subs, &nT)
+						} else { // если начальный нетерминал уже нашли
+							var tN Term
+							tN.nt.str = term.nt.str
+							*F2 = append(*F2, tN)
+							t.subs = appendTree(t.subs, term.nt.str)
+						}
 					}
 				}
 			}
@@ -495,7 +492,7 @@ func printAnswer(r []string, nr []string, pr []string) {
 	}
 }
 
-const TestsCount = 5
+const TestsCount = 6
 const TestsStart = 1
 
 func main() {
@@ -514,7 +511,7 @@ func main() {
 			cnt = 0
 			var F1, F2 []Term
 			wasEnding = false
-			pathToRoot = pathToRoot[0:0]
+			nonTermPath = nonTermPath[0:0]
 			t1 := getTree(cfg, v, v, &F1, &F2)
 			if checkF2(F2, regAnalysis(cfg)) {
 				if !checkF1F2Plus(cfg, F1, F2, F2) { // если Ф1 не входит в Ф2+
@@ -522,18 +519,18 @@ func main() {
 				} else { // если Ф1 входит в Ф2+
 					var str []string
 					path = make(map[string]string)
-					pathToRoot = pathToRoot[0:0]
+					nonTermPath = nonTermPath[0:0]
 					getAllTerminalStrings(cfg, v, &str)
 					var FF1 []Term
-					for _, c := range str {
+					for _, c := range str { // делаем из массива строк массив термов
 						var T Term
 						T.str = c
 						FF1 = append(FF1, T)
 					}
-					if checkF1F2Plus(cfg, FF1, F2, F2) {
+					if checkF1F2Plus(cfg, FF1, F2, F2) { // если новый Ф1 входит в Ф2+
 						reg := regAnalysis(cfg)
 						_, b := reg[v]
-						if b {
+						if b { // если нетерминал есть в множестве Mi
 							regular = append(regular, v)
 						} else {
 							probablyRegular = append(probablyRegular, v)
@@ -551,6 +548,12 @@ func main() {
 		l3 := len(probablyNonRegular)
 		checkRegular(cfg, "S", &regular, &probablyRegular)
 		if l1 == len(regular) && l2 == len(probablyRegular) && l3 == 0 {
+			/*
+				Если рекурсивное замыкание не дало никакой
+				информации об исходном нетерминале S, но не было и
+				подозрительных нерегулярных накачек S, сообщаем, что
+				регулярность языка не удалось определить.
+			*/
 			fmt.Println("Регулярность языка не удалось определить")
 		}
 		printAnswer(regular, probablyNonRegular, probablyRegular)

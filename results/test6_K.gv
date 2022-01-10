@@ -1,0 +1,14 @@
+digraph G {
+	0[label="K"]
+	1[label="a"]
+	2[label="a"]
+	3[label="a"]
+	4[label="K"]
+	5[label="a"]
+	0->1
+	0->2
+	0->3
+	0->4
+	0->5
+
+}

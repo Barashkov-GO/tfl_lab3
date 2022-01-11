@@ -209,10 +209,8 @@ func checkF2(F2 []Term, m map[string]Nterm) bool {
 		return false
 	}
 	for _, val := range F2 {
-		v := val.nt.str
-		f1, _ := regexp.MatchString("[a-z]", v)
-		if !f1 {
-			_, f2 := m[v]
+		if val.str == "" {
+			_, f2 := m[val.nt.str]
 			if !f2 {
 				return false
 			}
@@ -222,6 +220,9 @@ func checkF2(F2 []Term, m map[string]Nterm) bool {
 }
 
 func checkF1F2Plus(cfg CFG, F1 []Term, F2 []Term, F2Start []Term) bool {
+	if len(F1) == 0 {
+		return true
+	}
 	if len(F2) == 0 {
 		if len(F2Start) != 0 {
 			return checkF1F2Plus(cfg, F1, F2Start, F2Start)
@@ -513,8 +514,8 @@ func printAnswer(r []string, nr []string, pr []string) {
 	}
 }
 
-const TestsCount = 6
-const TestsStart = 6
+const TestsStart = 1
+const TestsCount = 7
 
 func main() {
 	for i := TestsStart; i <= TestsCount; i++ {
@@ -547,7 +548,7 @@ func main() {
 					probablyNonRegular = append(probablyNonRegular, v)
 				} else {
 					// если Ф1 входит в Ф2+
-					var str map[string]string
+					str := make(map[string]string)
 					path = make(map[string]string)
 					nonTermPath = nonTermPath[0:0]
 					for j := 0; j < len(cfg.rules); j++ {

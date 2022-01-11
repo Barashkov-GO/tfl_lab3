@@ -403,16 +403,45 @@ func regAnalysis(cfg CFG) (out map[string]Nterm) {
 	*/
 	out = make(map[string]Nterm)
 	for _, r := range cfg.rules {
-		if checkNtermNterm(cfg, r.nt) {
+		if checkNtermForTerminalRule(cfg, r.nt) {
 			out[r.nt.str] = r.nt
+			break
 		}
 	}
 	for _, r := range cfg.rules {
-		if checkNterm(cfg, r.nt, out) {
+		if checkNtermForLastNtermOfRule(cfg, r.nt, out) {
 			out[r.nt.str] = r.nt
+		} else {
+			delete(out, r.nt.str)
 		}
 	}
 	return
+}
+
+func checkNtermForLastNtermOfRule(cfg CFG, nt Nterm, out map[string]Nterm) bool {
+	var indices []int
+	for ind, rule := range cfg.rules { // нашли все правила с этим нетерминалом
+		if rule.nt.str == nt.str {
+			indices = append(indices, ind)
+		}
+	}
+	f := true
+	for _, ind := range indices {
+		rule := cfg.rules[ind]
+		for i := 0; i < len(rule.t)-1; i++ {
+			if rule.t[i].nt.str != "" {
+				return false
+			}
+		}
+		if len(rule.t) != 0 {
+			lastNterm := rule.t[len(rule.t)-1]
+			_, b := out[lastNterm.nt.str]
+			if lastNterm.nt.str != "" && !b {
+				f = false
+			}
+		}
+	}
+	return f
 }
 
 func mapSearch(m map[string]Nterm, nterm Nterm) bool {
@@ -420,32 +449,26 @@ func mapSearch(m map[string]Nterm, nterm Nterm) bool {
 	return f
 }
 
-func checkNtermNterm(cfg CFG, nt Nterm) bool {
-	for _, r := range cfg.rules {
-		if r.nt.str == nt.str {
-			if len(r.t) != 0 {
-				return false
-			}
+func checkNtermForTerminalRule(cfg CFG, nt Nterm) bool {
+	var indices []int
+	for ind, rule := range cfg.rules { // нашли все правила с этим нетерминалом
+		if rule.nt.str == nt.str {
+			indices = append(indices, ind)
 		}
 	}
-	return true
-}
-
-func checkNterm(cfg CFG, nt Nterm, m map[string]Nterm) bool { // подходит ли нетерминал со всеми своими правилами под условия
-	for _, r := range cfg.rules {
-		if r.nt.str == nt.str {
-			if !r.isSLG {
-				return false
-			}
-			for _, t := range r.t {
-				_, b := m[t.nt.str]
-				if !b && t.str == "" { // если это нетерминал и его нет в мапе
-					return false
-				}
+	for _, ind := range indices { // добавили нетерминалы, которые переходят в терминальную строку
+		f := true
+		rule := cfg.rules[ind]
+		for _, term := range rule.t {
+			if term.nt.str != "" {
+				f = false
 			}
 		}
+		if f {
+			return true
+		}
 	}
-	return true
+	return false
 }
 
 func preparing(str string) (out string) {
@@ -516,7 +539,7 @@ func printAnswer(r []string, nr []string, pr []string) {
 	}
 }
 
-const TestsStart = 6
+const TestsStart = 1
 const TestsCount = 8
 
 func main() {
@@ -532,7 +555,6 @@ func main() {
 		childrenS := make(map[string]bool)
 		getChildren("S", cfg, &childrenS)
 		reg := regAnalysis(cfg)
-		fmt.Println(reg)
 		for v, _ := range childrenS {
 			_, b := reg[v]
 			if b {
@@ -544,13 +566,13 @@ func main() {
 			wasEnding = false
 			nonTermPath = nonTermPath[0:0]
 			t1 := getTree(cfg, v, v, &F1, &F2)
-			fmt.Println(v)
-			for _, v := range F1 {
-				fmt.Println("\tF1", v.str)
-			}
-			for _, v := range F2 {
-				fmt.Println("\tF2", v.str, v.nt.str)
-			}
+			//fmt.Println(v)
+			//for _, v := range F1 {
+			//	fmt.Println("\tF1", v.str)
+			//}
+			//for _, v := range F2 {
+			//	fmt.Println("\tF2", v.str, v.nt.str)
+			//}
 			if checkF2(F2, regAnalysis(cfg)) {
 				if !checkF1F2Plus(cfg, F1, F2, F2) {
 					// если Ф1 не входит в Ф2+

@@ -167,7 +167,7 @@ func getTree(cfg CFG, nonTerm string, baseNonTerm string, F1 *[]Term, F2 *[]Term
 					*F1 = append(*F1, tN)
 				} else {
 					var tN Term
-					tN.nt.str = term.str
+					tN.str = term.str
 					*F2 = append(*F2, tN)
 				}
 			} else { // если встретили нетерминал
@@ -511,7 +511,7 @@ func printAnswer(r []string, nr []string, pr []string) {
 }
 
 const TestsCount = 6
-const TestsStart = 1
+const TestsStart = 6
 
 func main() {
 	for i := TestsStart; i <= TestsCount; i++ {
@@ -531,6 +531,13 @@ func main() {
 			wasEnding = false
 			nonTermPath = nonTermPath[0:0]
 			t1 := getTree(cfg, v, v, &F1, &F2)
+			//fmt.Println(v)
+			//for _, v := range F1 {
+			//	fmt.Println("\tF1", v.str)
+			//}
+			//for _, v := range F2 {
+			//	fmt.Println("\tF2", v.str, v.nt.str)
+			//}
 			if checkF2(F2, regAnalysis(cfg)) {
 				if !checkF1F2Plus(cfg, F1, F2, F2) {
 					// если Ф1 не входит в Ф2+
@@ -579,6 +586,7 @@ func main() {
 		for v, _ := range childrenS {
 			checkRegular(cfg, v, &regular, &probablyRegular)
 		}
+		//fmt.Println(regular, probablyRegular, probablyNonRegular)
 		l1 := len(regular)
 		l2 := len(probablyRegular)
 		l3 := len(probablyNonRegular)

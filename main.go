@@ -205,6 +205,9 @@ func getTree(cfg CFG, nonTerm string, baseNonTerm string, F1 *[]Term, F2 *[]Term
 }
 
 func checkF2(F2 []Term, m map[string]Nterm) bool {
+	if len(F2) == 0 {
+		return false
+	}
 	for _, val := range F2 {
 		v := val.nt.str
 		f1, _ := regexp.MatchString("[a-z]", v)

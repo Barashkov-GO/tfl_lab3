@@ -49,13 +49,12 @@ type Rule struct {
 }
 
 func RuleSLG(r Rule) bool {
-	if len(r.t) == 0 {
-		return true
+	for i := 0; i < len(r.t)-1; i++ {
+		if r.t[i].nt.str != "" {
+			return false
+		}
 	}
-	if len(r.t) == 1 && r.t[0].str == "" {
-		return true
-	}
-	return false
+	return true
 }
 
 func RuleInit(str string) (r Rule) {
@@ -438,8 +437,11 @@ func checkNterm(cfg CFG, nt Nterm, m map[string]Nterm) bool { // подходи�
 			if !r.isSLG {
 				return false
 			}
-			if len(r.t) == 1 && r.t[0].nt.str != nt.str && !mapSearch(m, r.t[0].nt) {
-				return false
+			for _, t := range r.t {
+				_, b := m[t.nt.str]
+				if !b && t.str == "" { // если это нетерминал и его нет в мапе
+					return false
+				}
 			}
 		}
 	}
@@ -514,8 +516,8 @@ func printAnswer(r []string, nr []string, pr []string) {
 	}
 }
 
-const TestsStart = 1
-const TestsCount = 7
+const TestsStart = 6
+const TestsCount = 8
 
 func main() {
 	for i := TestsStart; i <= TestsCount; i++ {
@@ -529,19 +531,26 @@ func main() {
 		cfg := read("tests/test" + strconv.Itoa(i) + ".txt")
 		childrenS := make(map[string]bool)
 		getChildren("S", cfg, &childrenS)
+		reg := regAnalysis(cfg)
+		fmt.Println(reg)
 		for v, _ := range childrenS {
+			_, b := reg[v]
+			if b {
+				regular = append(regular, v)
+				continue
+			}
 			cnt = 0
 			var F1, F2 []Term
 			wasEnding = false
 			nonTermPath = nonTermPath[0:0]
 			t1 := getTree(cfg, v, v, &F1, &F2)
-			//fmt.Println(v)
-			//for _, v := range F1 {
-			//	fmt.Println("\tF1", v.str)
-			//}
-			//for _, v := range F2 {
-			//	fmt.Println("\tF2", v.str, v.nt.str)
-			//}
+			fmt.Println(v)
+			for _, v := range F1 {
+				fmt.Println("\tF1", v.str)
+			}
+			for _, v := range F2 {
+				fmt.Println("\tF2", v.str, v.nt.str)
+			}
 			if checkF2(F2, regAnalysis(cfg)) {
 				if !checkF1F2Plus(cfg, F1, F2, F2) {
 					// если Ф1 не входит в Ф2+
@@ -573,7 +582,6 @@ func main() {
 					}
 					if isTerminalStringsInF2 {
 						// если все новые Ф1 входят в Ф2+, то возможна регулярности
-						reg := regAnalysis(cfg)
 						_, b := reg[v]
 						if b {
 							// если нетерминал есть в множестве Mi, то регулярен

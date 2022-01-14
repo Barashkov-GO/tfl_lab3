@@ -541,13 +541,17 @@ func graphViz(i int, t Tree) {
 func printAnswer(r []string, nr []string, pr []string) {
 	m := make(map[string]bool)
 	for _, v := range r {
-		m[v] = true
-		fmt.Println("Язык " + v + " регулярен")
+		_, b := m[v]
+		if !b {
+			fmt.Println("Язык " + v + " регулярен")
+			m[v] = true
+		}
 	}
 	for _, v := range pr {
 		_, b := m[v]
 		if !b {
 			fmt.Println("Язык " + v + " возможно регулярен")
+			m[v] = true
 		}
 	}
 	for _, v := range nr {
@@ -557,6 +561,7 @@ func printAnswer(r []string, nr []string, pr []string) {
 				"Дерево накачки нетерминала " +
 					v +
 					" подозрительно на нерегулярную накачку")
+			m[v] = true
 		}
 	}
 }

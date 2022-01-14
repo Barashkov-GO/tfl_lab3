@@ -134,7 +134,7 @@ func appendTree(subs []*Tree, value string) []*Tree {
 	return append(subs, &nT)
 }
 
-func isInPath(nonTerm string) bool {
+func isInPath(nonTerm string, nonTermPath []string) bool {
 	for _, v := range nonTermPath {
 		if v == nonTerm {
 			return true
@@ -143,8 +143,7 @@ func isInPath(nonTerm string) bool {
 	return false
 }
 
-func getTree(cfg CFG, nonTerm string, baseNonTerm string, F1 *[]Term, F2 *[]Term) (t Tree) {
-	t.value = nonTerm
+func getTree(cfg CFG, nonTerm string, baseNonTerm string, FF1 *[]Term, FF2 *[]Term, isRec bool) (Tree, bool) {
 	var indices []int
 	for i, r := range cfg.rules { // находим все индексы, правила по которым в левой части содержат данный нетерминал
 		if r.nt.str == nonTerm {
@@ -152,55 +151,77 @@ func getTree(cfg CFG, nonTerm string, baseNonTerm string, F1 *[]Term, F2 *[]Term
 		}
 	}
 	for _, ind := range indices { // идем по всем правилам данного нетерминала
+		var t Tree
+		t.value = nonTerm
+		var F1 []Term
+		var F2 []Term
+
+		if !isRec {
+			nonTermPath = nonTermPath[0:0]
+			*FF1 = (*FF1)[0:0]
+			*FF2 = (*FF2)[0:0]
+		}
+		countAppended := 0
 		rule := cfg.rules[ind]
 		t.subs = appendTree(t.subs, rule.str) // добавляем первый терминал как листик
 		var tN Term
 		tN.str = rule.str
-		*F1 = append(*F1, tN)
-		for _, term := range rule.t { // идем по термам
+		F1 = append(F1, tN)
+		for i, term := range rule.t { // идем по термам
 			if term.str != "" { // если встретили терминал
 				t.subs = appendTree(t.subs, term.str)
 				if !wasEnding {
 					var tN Term
 					tN.str = term.str
-					*F1 = append(*F1, tN)
+					F1 = append(F1, tN)
 				} else {
 					var tN Term
 					tN.str = term.str
-					*F2 = append(*F2, tN)
+					F2 = append(F2, tN)
 				}
 			} else { // если встретили нетерминал
-				if isInPath(term.nt.str) { // если по этому нетерминалу уже строили поддерево
+				if isInPath(term.nt.str, nonTermPath) { // если по этому нетерминалу уже строили поддерево
 					t.subs = appendTree(t.subs, term.nt.str)
 				} else {
 					nonTermPath = append(nonTermPath, term.nt.str)
+					countAppended++
 					if term.nt.str == baseNonTerm { // если нетерминал начальный
 						if wasEnding {
 							var tN Term
 							tN.nt.str = term.nt.str
-							*F2 = append(*F2, tN)
+							F2 = append(F2, tN)
 						}
 						wasEnding = true
 						t.subs = appendTree(t.subs, term.nt.str)
+						for j := i + 1; j < len(rule.t); j++ {
+							termNew := rule.t[j]
+							F2 = append(F2, termNew)
+							t.subs = appendTree(t.subs, termNew.str+termNew.nt.str)
+						}
 					} else { // если нетерминал не начальный
 						if !wasEnding { // если начальный нетерминал еще не нашли
-							nT := getTree(cfg, term.nt.str, baseNonTerm, F1, F2)
+							nT, _ := getTree(cfg, term.nt.str, baseNonTerm, &F1, &F2, true)
 							nT.number = cnt + 1
 							cnt++
 							t.subs = append(t.subs, &nT)
 						} else { // если начальный нетерминал уже нашли
 							var tN Term
 							tN.nt.str = term.nt.str
-							*F2 = append(*F2, tN)
+							F2 = append(F2, tN)
 							t.subs = appendTree(t.subs, term.nt.str)
 						}
 					}
 				}
 			}
+			if wasEnding {
+				*FF1 = append(*FF1, F1...)
+				*FF2 = append(*FF2, F2...)
+				return t, true
+			}
 		}
-
 	}
-	return t
+	var t Tree
+	return t, false
 }
 
 func checkF2(F2 []Term, m map[string]Nterm) bool {
@@ -239,7 +260,7 @@ func checkF1F2Plus(cfg CFG, F1 []Term, F2 []Term, F2Start []Term) bool {
 		f := false
 		for _, r := range cfg.rules {
 			if r.nt.str == F2[0].nt.str {
-				if r.t[0].str == F1[0].str {
+				if r.str == F1[0].str || r.t[0].str == F1[0].str {
 					F1 = F1[1:]
 					F2 = append(r.t, F2...)
 					if checkF1F2Plus(cfg, F1, F2, F2Start) {
@@ -279,7 +300,8 @@ func getAllTerminalStrings(cfg CFG, indBegin int, nonTerm string, out *map[strin
 func getTerminalString(cfg CFG, nonTerm string, out *string) bool {
 	var F1 []Term
 	var F2 []Term
-	t := getTree(cfg, nonTerm, nonTerm, &F1, &F2)
+	nonTermPath = nonTermPath[0:0]
+	t, _ := getTree(cfg, nonTerm, nonTerm, &F1, &F2, false)
 	for _, ch := range t.subs {
 		f, _ := regexp.MatchString("[a-z]", ch.value)
 		if f {
@@ -543,6 +565,11 @@ const TestsStart = 1
 const TestsCount = 8
 
 func main() {
+	cmd1 := exec.Command("rm", "-r", "results/images/*")
+	cmd2 := exec.Command("rm", "-r", "results/test*")
+	cmd1.Run()
+	cmd2.Run()
+	// важен порядок, есть дополнительные символы
 	for i := TestsStart; i <= TestsCount; i++ {
 		var (
 			regular            []string
@@ -565,18 +592,21 @@ func main() {
 			var F1, F2 []Term
 			wasEnding = false
 			nonTermPath = nonTermPath[0:0]
-			t1 := getTree(cfg, v, v, &F1, &F2)
-			//fmt.Println(v)
-			//for _, v := range F1 {
-			//	fmt.Println("\tF1", v.str)
+			t1, isTreeReturned := getTree(cfg, v, v, &F1, &F2, false)
+			//if isTreeReturned {
+			//	fmt.Println(v)
+			//	for _, v := range F1 {
+			//		fmt.Println("\tF1", v.str)
+			//	}
+			//	for _, v := range F2 {
+			//		fmt.Println("\tF2", v.str, v.nt.str)
+			//	}
 			//}
-			//for _, v := range F2 {
-			//	fmt.Println("\tF2", v.str, v.nt.str)
-			//}
-			if checkF2(F2, regAnalysis(cfg)) {
+			if isTreeReturned && checkF2(F2, regAnalysis(cfg)) {
 				if !checkF1F2Plus(cfg, F1, F2, F2) {
 					// если Ф1 не входит в Ф2+
 					probablyNonRegular = append(probablyNonRegular, v)
+					graphViz(i, t1)
 				} else {
 					// если Ф1 входит в Ф2+
 					str := make(map[string]string)
@@ -615,7 +645,6 @@ func main() {
 					}
 				}
 			}
-			graphViz(i, t1)
 		}
 		for v, _ := range childrenS {
 			checkRegular(cfg, v, &regular, &probablyRegular)

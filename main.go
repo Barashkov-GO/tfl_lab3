@@ -167,7 +167,7 @@ func getTree(cfg CFG, nonTerm string, baseNonTerm string, FF1 *[]Term, FF2 *[]Te
 		var tN Term
 		tN.str = rule.str
 		F1 = append(F1, tN)
-		for i, term := range rule.t { // идем по термам
+		for _, term := range rule.t { // идем по термам
 			if term.str != "" { // если встретили терминал
 				t.subs = appendTree(t.subs, term.str)
 				if !wasEnding {
@@ -193,11 +193,11 @@ func getTree(cfg CFG, nonTerm string, baseNonTerm string, FF1 *[]Term, FF2 *[]Te
 						}
 						wasEnding = true
 						t.subs = appendTree(t.subs, term.nt.str)
-						for j := i + 1; j < len(rule.t); j++ {
-							termNew := rule.t[j]
-							F2 = append(F2, termNew)
-							t.subs = appendTree(t.subs, termNew.str+termNew.nt.str)
-						}
+						//for j := i + 1; j < len(rule.t); j++ {
+						//	termNew := rule.t[j]
+						//	F2 = append(F2, termNew)
+						//	t.subs = appendTree(t.subs, termNew.str+termNew.nt.str)
+						//}
 					} else { // если нетерминал не начальный
 						if !wasEnding { // если начальный нетерминал еще не нашли
 							nT, _ := getTree(cfg, term.nt.str, baseNonTerm, &F1, &F2, true)
@@ -213,11 +213,11 @@ func getTree(cfg CFG, nonTerm string, baseNonTerm string, FF1 *[]Term, FF2 *[]Te
 					}
 				}
 			}
-			if wasEnding {
-				*FF1 = append(*FF1, F1...)
-				*FF2 = append(*FF2, F2...)
-				return t, true
-			}
+		}
+		if wasEnding {
+			*FF1 = append(*FF1, F1...)
+			*FF2 = append(*FF2, F2...)
+			return t, true
 		}
 	}
 	var t Tree
@@ -260,7 +260,7 @@ func checkF1F2Plus(cfg CFG, F1 []Term, F2 []Term, F2Start []Term) bool {
 		f := false
 		for _, r := range cfg.rules {
 			if r.nt.str == F2[0].nt.str {
-				if r.str == F1[0].str || r.t[0].str == F1[0].str {
+				if r.str == F1[0].str || (len(r.t) > 0 && r.t[0].str == F1[0].str) {
 					F1 = F1[1:]
 					F2 = append(r.t, F2...)
 					if checkF1F2Plus(cfg, F1, F2, F2Start) {

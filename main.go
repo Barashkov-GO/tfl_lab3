@@ -96,11 +96,41 @@ type CFG struct {
 }
 
 func CFGInit(str string) (cfg CFG) {
-	strs := strings.Split(str, "\n")
+	strs := reloadCFG(str)
 	for _, s := range strs {
 		cfg.rules = append(cfg.rules, RuleInit(s))
 	}
 	return
+}
+
+func reloadCFG(str string) (out []string) {
+	str = strings.ReplaceAll(str, " ", "")
+	strs := strings.Split(str, "\n")
+	for _, s := range strs {
+		slr := strings.Split(s, "->")
+		sr := slr[1]
+		a, _ := regexp.MatchString("[A-Z]", string(sr[0]))
+		if a {
+			rules := findAllRules(string(sr[0]), strs)
+			for _, r := range rules {
+				newStr := string(slr[0]) + "->" + r + sr[1:]
+				out = append(out, newStr)
+			}
+		} else {
+			out = append(out, s)
+		}
+	}
+	return
+}
+
+func findAllRules(nt string, strs []string) []string {
+	var out []string
+	for _, s1 := range strs {
+		if string(s1[0]) == nt {
+			out = append(out, strings.Split(s1, "->")[1])
+		}
+	}
+	return out
 }
 
 func (cfg CFG) toString() (str string) {

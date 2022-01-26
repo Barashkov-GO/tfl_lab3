@@ -1,5 +1,10 @@
-K -> aaKa
-K -> a
-S -> aM
-S -> bM
-M -> aK
+S -> aPI
+P -> bP
+P -> z
+I -> zI
+I -> bB
+I -> c
+I -> dPI
+B -> bB
+B -> c
+B -> dPI

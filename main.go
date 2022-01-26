@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"regexp"
@@ -535,15 +536,11 @@ func preparing(str string) (out string) {
 }
 
 func read(path string) (cfg CFG) {
-	file, err := os.Open(path)
+	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		panic(err)
 	}
-	defer file.Close()
-	data := make([]byte, 64)
-	n, _ := file.Read(data)
-	cfg = CFGInit(preparing(string(data[:n])))
+	cfg = CFGInit(preparing(string(data)))
 	return
 }
 
